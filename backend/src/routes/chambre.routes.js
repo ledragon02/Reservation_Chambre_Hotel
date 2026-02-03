@@ -1,56 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { Chambre } = require('../models');
+const chambreController = require('../controllers/chambre.controller');
 
-// GET toutes les chambres
-router.get('/', async (req, res) => {
-  const chambres = await Chambre.findAll();
-  res.json(chambres);
-});
-
-// GET une chambre par ID
-router.get('/:id', async (req, res) => {
-  const chambre = await Chambre.findByPk(req.params.id);
-  if (!chambre) {
-    return res.status(404).json({ error: 'Chambre non trouvée' });
-  }
-  res.json(chambre);
-});
-
-// POST créer une chambre
-router.post('/', async (req, res) => {
-  try {
-    const chambre = await Chambre.create(req.body);
-    res.status(201).json(chambre);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-// PUT modifier une chambre
-router.put('/:id', async (req, res) => {
-  try {
-    const chambre = await Chambre.findByPk(req.params.id);
-    if (!chambre) {
-      return res.status(404).json({ error: 'Chambre non trouvée' });
-    }
-
-    await chambre.update(req.body);
-    res.json(chambre);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-// DELETE supprimer une chambre
-router.delete('/:id', async (req, res) => {
-  const chambre = await Chambre.findByPk(req.params.id);
-  if (!chambre) {
-    return res.status(404).json({ error: 'Chambre non trouvée' });
-  }
-
-  await chambre.destroy();
-  res.json({ message: 'Chambre supprimée avec succès' });
-});
+router.get('/', chambreController.getAllChambres);
+router.get('/:id', chambreController.getChambreById);
+router.post('/', chambreController.createChambre);
+router.put('/:id', chambreController.updateChambre);
+router.delete('/:id', chambreController.deleteChambre);
 
 module.exports = router;

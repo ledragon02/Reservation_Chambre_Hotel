@@ -2,12 +2,14 @@ const express = require('express');
 const app = express();
 const sequelize = require('./config/database');
 const chambreRoutes = require('./routes/chambre.routes');
+const optionRoutes = require('./routes/option.routes');
 
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
 app.use('/chambres', chambreRoutes);
+app.use('/options', optionRoutes);
 
 app.get('/', (req, res) => {
   res.send('API Hotel Reservation fonctionne !');
