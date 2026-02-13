@@ -7,6 +7,7 @@ const chambreOptionRoutes = require('./routes/chambreOption.routes');
 const serviceRoutes = require('./routes/service.routes');
 const saisonRoutes = require('./routes/saison.routes');
 const reservationRoutes = require('./routes/reservation.routes');
+const reservationServiceRoutes = require('./routes/reservationService.routes');
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
@@ -17,6 +18,8 @@ app.use('/', chambreOptionRoutes);
 app.use('/saisons', saisonRoutes);
 app.use('/services', serviceRoutes);
 app.use('/reservations', reservationRoutes);
+app.use('/', reservationServiceRoutes);
+
 
 app.get('/', (req, res) => {
   res.send('API Hotel Reservation fonctionne !');

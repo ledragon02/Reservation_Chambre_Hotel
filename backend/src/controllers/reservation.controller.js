@@ -1,15 +1,15 @@
-const { Reservation, Chambre, Saison } = require('../models');
+const { Reservation, Chambre, Saison, Service } = require('../models');
 
 exports.getAll = async (req, res) => {
   const reservations = await Reservation.findAll({
-    include: [Chambre, Saison]
+    include: [Chambre, Saison, Service]
   });
   res.json(reservations);
 };
 
 exports.getOne = async (req, res) => {
   const reservation = await Reservation.findByPk(req.params.id, {
-    include: [Chambre, Saison]
+    include: [Chambre, Saison, Service]
   });
 
   if (!reservation) {
@@ -21,7 +21,14 @@ exports.getOne = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const { date_debut, date_fin, nombre_personnes, ChambreId, SaisonId } = req.body;
+    const { 
+      date_debut, 
+      date_fin, 
+      nombre_personnes, 
+      ChambreId, 
+      SaisonId,
+      servicesIds   // tableau d'IDs de services
+    } = req.body;
 
     const chambre = await Chambre.findByPk(ChambreId);
     const saison = await Saison.findByPk(SaisonId);
@@ -36,11 +43,23 @@ exports.create = async (req, res) => {
     const diffTime = Math.abs(end - start);
     const nombre_nuits = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    // Calcul prix
-    const prix_total =
+    // Base chambre × saison × nuits
+    let prix_total =
       chambre.prix_base *
       saison.multiplicateur_prix *
       nombre_nuits;
+
+    // Ajouter les services si fournis
+    let services = [];
+    if (servicesIds && servicesIds.length > 0) {
+      services = await Service.findAll({
+        where: { id: servicesIds }
+      });
+
+      services.forEach(service => {
+        prix_total += service.prix;
+      });
+    }
 
     const reservation = await Reservation.create({
       date_debut,
@@ -51,13 +70,17 @@ exports.create = async (req, res) => {
       prix_total
     });
 
+    // Associer les services
+    if (services.length > 0) {
+      await reservation.addServices(services);
+    }
+
     res.status(201).json(reservation);
 
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
-
 
 exports.update = async (req, res) => {
   const reservation = await Reservation.findByPk(req.params.id);
