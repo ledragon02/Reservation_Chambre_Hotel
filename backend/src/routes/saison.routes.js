@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/reservation.controller');
+const controller = require('../controllers/saison.controller');
 
 router.get('/', controller.getAll);
 router.get('/:id', controller.getOne);

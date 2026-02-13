@@ -10,9 +10,13 @@ const Reservation = sequelize.define('Reservation', {
     type: DataTypes.DATE,
     allowNull: false
   },
+  nombre_personnes: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
   prix_total: {
     type: DataTypes.FLOAT,
-    allowNull: false
+    allowNull: true
   }
 });
 
