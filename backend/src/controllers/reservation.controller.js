@@ -1,15 +1,30 @@
-const { Reservation, Chambre, Saison, Service } = require('../models');
+const { Reservation, Chambre, Saison, Service, Option } = require('../models');
 
 exports.getAll = async (req, res) => {
   const reservations = await Reservation.findAll({
-    include: [Chambre, Saison, Service]
+    include: [
+      {
+        model: Chambre,
+        include: [Option] // options incluses via la chambre
+      },
+      Saison,
+      Service
+    ]
   });
+
   res.json(reservations);
 };
 
 exports.getOne = async (req, res) => {
   const reservation = await Reservation.findByPk(req.params.id, {
-    include: [Chambre, Saison, Service]
+    include: [
+      {
+        model: Chambre,
+        include: [Option]
+      },
+      Saison,
+      Service
+    ]
   });
 
   if (!reservation) {
@@ -19,18 +34,23 @@ exports.getOne = async (req, res) => {
   res.json(reservation);
 };
 
+
 exports.create = async (req, res) => {
   try {
-    const { 
-      date_debut, 
-      date_fin, 
-      nombre_personnes, 
-      ChambreId, 
+    const {
+      date_debut,
+      date_fin,
+      nombre_personnes,
+      ChambreId,
       SaisonId,
-      servicesIds   // tableau d'IDs de services
+      servicesIds
     } = req.body;
 
-    const chambre = await Chambre.findByPk(ChambreId);
+    //  On inclut maintenant les Options
+    const chambre = await Chambre.findByPk(ChambreId, {
+      include: Option
+    });
+
     const saison = await Saison.findByPk(SaisonId);
 
     if (!chambre || !saison) {
@@ -48,6 +68,13 @@ exports.create = async (req, res) => {
       chambre.prix_base *
       saison.multiplicateur_prix *
       nombre_nuits;
+
+    //  Ajouter les options de la chambre
+    if (chambre.Options) {
+      chambre.Options.forEach(option => {
+        prix_total += option.supplement_prix;
+      });
+    }
 
     // Ajouter les services si fournis
     let services = [];
@@ -70,7 +97,6 @@ exports.create = async (req, res) => {
       prix_total
     });
 
-    // Associer les services
     if (services.length > 0) {
       await reservation.addServices(services);
     }
