@@ -17,7 +17,11 @@ const Reservation = sequelize.define('Reservation', {
   prix_total: {
     type: DataTypes.FLOAT,
     allowNull: true
-  }
+  },
+  statut: {
+  type: DataTypes.STRING,
+  defaultValue: "en_attente"
+}
 });
 
 module.exports = Reservation;
