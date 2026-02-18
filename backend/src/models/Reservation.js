@@ -21,7 +21,12 @@ const Reservation = sequelize.define('Reservation', {
   statut: {
   type: DataTypes.STRING,
   defaultValue: "en_attente"
+},
+  statut_paiement: {
+  type: DataTypes.STRING,
+  defaultValue: "en_attente"
 }
+
 });
 
 module.exports = Reservation;

@@ -1,43 +1,67 @@
 const { Op } = require('sequelize');
-const { Reservation, Chambre, Saison, Service, Option } = require('../models');
+const { Reservation, Chambre, Saison, Service, Option, User } = require('../models');
 
 exports.getAll = async (req, res) => {
-  const reservations = await Reservation.findAll({
-    include: [
-      {
-        model: Chambre,
-        include: [Option] // options incluses via la chambre
-      },
-      Saison,
-      Service
-    ]
-  });
+  try {
 
-  res.json(reservations);
+    let whereCondition = {};
+
+    // Si client → voir seulement ses réservations
+    if (req.user.role === "client") {
+      whereCondition.UserId = req.user.id;
+    }
+
+    const reservations = await Reservation.findAll({
+      where: whereCondition,
+      include: [
+        {
+          model: Chambre,
+          include: [Option]
+        },
+        Saison,
+        Service,
+        User
+      ]
+    });
+
+    res.json(reservations);
+
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 };
 
+
 exports.getOne = async (req, res) => {
-  const reservation = await Reservation.findByPk(req.params.id, {
-    include: [
-      {
-        model: Chambre,
-        include: [Option]
-      },
-      Saison,
-      Service
-    ]
-  });
+  try {
 
-  if (!reservation) {
-    return res.status(404).json({ error: 'Reservation non trouvée' });
+    const reservation = await Reservation.findByPk(req.params.id, {
+      include: [
+        {
+          model: Chambre,
+          include: [Option]
+        },
+        Saison,
+        Service,
+        User
+      ]
+    });
+
+    if (!reservation) {
+      return res.status(404).json({ error: 'Reservation non trouvée' });
+    }
+
+    res.json(reservation);
+
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
-
-  res.json(reservation);
 };
 
 
 exports.create = async (req, res) => {
   try {
+
     const {
       date_debut,
       date_fin,
@@ -47,7 +71,9 @@ exports.create = async (req, res) => {
       servicesIds
     } = req.body;
 
-    //  On inclut maintenant les Options
+    // On récupère l'utilisateur depuis le token
+    const userId = req.user.id;
+
     const chambre = await Chambre.findByPk(ChambreId, {
       include: Option
     });
@@ -60,21 +86,17 @@ exports.create = async (req, res) => {
 
     // Vérifier disponibilité chambre
     const reservationExistante = await Reservation.findOne({
-    where: {
+      where: {
         ChambreId,
-        date_debut: {
-        [Op.lt]: date_fin
-        },
-        date_fin: {
-        [Op.gt]: date_debut
-        }
-    }
+        date_debut: { [Op.lt]: date_fin },
+        date_fin: { [Op.gt]: date_debut }
+      }
     });
 
     if (reservationExistante) {
-    return res.status(400).json({
+      return res.status(400).json({
         error: "Cette chambre est déjà réservée sur ces dates"
-    });
+      });
     }
 
     // Calcul nombre de nuits
@@ -89,14 +111,14 @@ exports.create = async (req, res) => {
       saison.multiplicateur_prix *
       nombre_nuits;
 
-    //  Ajouter les options de la chambre
+    // Ajouter options de la chambre
     if (chambre.Options) {
       chambre.Options.forEach(option => {
         prix_total += option.supplement_prix;
       });
     }
 
-    // Ajouter les services si fournis
+    // Ajouter services si fournis
     let services = [];
     if (servicesIds && servicesIds.length > 0) {
       services = await Service.findAll({
@@ -114,7 +136,8 @@ exports.create = async (req, res) => {
       nombre_personnes,
       ChambreId,
       SaisonId,
-      prix_total
+      prix_total,
+      UserId: userId   // 🔥 sécurisé via JWT
     });
 
     if (services.length > 0) {
@@ -128,26 +151,29 @@ exports.create = async (req, res) => {
   }
 };
 
+
 exports.update = async (req, res) => {
   try {
+
     const reservation = await Reservation.findByPk(req.params.id);
 
     if (!reservation) {
       return res.status(404).json({ error: 'Reservation non trouvée' });
     }
 
-    const {
-      date_debut,
-      date_fin,
-      ChambreId
-    } = req.body;
+    if (reservation.statut === "confirmée") {
+      return res.status(400).json({
+        error: "Impossible de modifier une réservation confirmée"
+      });
+    }
 
-    // Si on modifie les dates ou la chambre → vérifier conflit
+    const { date_debut, date_fin, ChambreId } = req.body;
+
     if (date_debut && date_fin && ChambreId) {
 
       const reservationExistante = await Reservation.findOne({
         where: {
-          id: { [Op.ne]: reservation.id }, // exclure la réservation actuelle
+          id: { [Op.ne]: reservation.id },
           ChambreId,
           date_debut: { [Op.lt]: date_fin },
           date_fin: { [Op.gt]: date_debut }
@@ -170,45 +196,97 @@ exports.update = async (req, res) => {
   }
 };
 
+
 exports.confirmer = async (req, res) => {
-  const reservation = await Reservation.findByPk(req.params.id);
+  try {
 
-  if (!reservation) {
-    return res.status(404).json({ error: "Reservation non trouvée" });
+    const reservation = await Reservation.findByPk(req.params.id);
+
+    if (!reservation) {
+      return res.status(404).json({ error: "Reservation non trouvée" });
+    }
+
+    if (reservation.statut === "annulée") {
+      return res.status(400).json({ error: "Impossible de confirmer une réservation annulée" });
+    }
+    if (reservation.statut_paiement !== "payé") {
+  return res.status(400).json({
+    error: "Impossible de confirmer une réservation non payée"
+  });
+}
+
+    await reservation.update({ statut: "confirmée" });
+
+    res.json(reservation);
+
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
-
-  if (reservation.statut === "annulée") {
-    return res.status(400).json({ error: "Impossible de confirmer une réservation annulée" });
-  }
-
-  await reservation.update({ statut: "confirmée" });
-
-  res.json(reservation);
 };
+
 
 exports.annuler = async (req, res) => {
-  const reservation = await Reservation.findByPk(req.params.id);
+  try {
 
-  if (!reservation) {
-    return res.status(404).json({ error: "Reservation non trouvée" });
+    const reservation = await Reservation.findByPk(req.params.id);
+
+    if (!reservation) {
+      return res.status(404).json({ error: "Reservation non trouvée" });
+    }
+
+    if (reservation.statut === "confirmée") {
+      return res.status(400).json({ error: "Impossible d’annuler une réservation confirmée" });
+    }
+
+    await reservation.update({ statut: "annulée" });
+
+    res.json(reservation);
+
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
-
-  if (reservation.statut === "confirmée") {
-    return res.status(400).json({ error: "Impossible d’annuler une réservation confirmée" });
-  }
-
-  await reservation.update({ statut: "annulée" });
-
-  res.json(reservation);
 };
 
+exports.payer = async (req, res) => {
+  try {
+
+    const reservation = await Reservation.findByPk(req.params.id);
+
+    if (!reservation) {
+      return res.status(404).json({ error: "Reservation non trouvée" });
+    }
+
+    if (reservation.statut_paiement === "payé") {
+      return res.status(400).json({ error: "Déjà payé" });
+    }
+
+    // Simulation paiement réussi
+    await reservation.update({ statut_paiement: "payé" });
+
+    res.json({
+      message: "Paiement effectué avec succès",
+      reservation
+    });
+
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
 
 exports.remove = async (req, res) => {
-  const reservation = await Reservation.findByPk(req.params.id);
-  if (!reservation) {
-    return res.status(404).json({ error: 'Reservation non trouvée' });
-  }
+  try {
 
-  await reservation.destroy();
-  res.json({ message: 'Reservation supprimée' });
+    const reservation = await Reservation.findByPk(req.params.id);
+
+    if (!reservation) {
+      return res.status(404).json({ error: 'Reservation non trouvée' });
+    }
+
+    await reservation.destroy();
+
+    res.json({ message: 'Reservation supprimée' });
+
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 };

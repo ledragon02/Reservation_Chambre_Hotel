@@ -1,5 +1,7 @@
 const express = require('express');
 const app = express();
+const cors = require("cors");
+app.use(cors());
 const sequelize = require('./config/database');
 const chambreRoutes = require('./routes/chambre.routes');
 const optionRoutes = require('./routes/option.routes');
@@ -8,6 +10,8 @@ const serviceRoutes = require('./routes/service.routes');
 const saisonRoutes = require('./routes/saison.routes');
 const reservationRoutes = require('./routes/reservation.routes');
 const reservationServiceRoutes = require('./routes/reservationService.routes');
+const authRoutes = require("./routes/auth.routes");
+const adminRoutes = require("./routes/admin.routes");
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
@@ -19,6 +23,8 @@ app.use('/saisons', saisonRoutes);
 app.use('/services', serviceRoutes);
 app.use('/reservations', reservationRoutes);
 app.use('/', reservationServiceRoutes);
+app.use("/auth", authRoutes);
+app.use("/admin", adminRoutes);
 
 
 app.get('/', (req, res) => {
